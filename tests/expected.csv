@@ -1,0 +1,11 @@
+file,step,expected
+complete/step1.png,1,accepted
+complete/step3.png,3,accepted
+complete/step4.png,4,accepted
+complete/step5.png,5,accepted
+incomplete/step1_no_command.png,1,missing
+incomplete/step3_no_file.png,3,missing
+incomplete/step4_wrong_perm.png,4,missing
+incomplete/step4_wrong_step.png,4,missing
+incomplete/step5_blurry.png,5,unclear
+incomplete/step5_after_close.png,5,missing
