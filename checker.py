@@ -1,11 +1,10 @@
-import os
-import re
-import json
+import os, re, json, time
 from PIL import Image, ImageFilter, ImageStat
 from google import genai
 from google.genai import types
 
-MODEL = "gemini-2.5-flash"
+# جربت gemini-2.5-flash بس صار ما يشتغل للمفاتيح الجديدة
+MODEL = 'gemini-3.5-flash'
 
 extract_prompt = """Read these lab instructions. Return only the steps that ask the student to take a screenshot.
 For each step return:
@@ -32,61 +31,81 @@ Return JSON: {"status": "", "missing": [], "confidence": 0-100, "note": "short n
 
 
 def get_client(key=None):
-    key = key or os.getenv("GEMINI_API_KEY")
+    if not key:
+        key = os.getenv("GEMINI_API_KEY")
     if key:
         return genai.Client(api_key=key)
     return None
 
 
 def ask(client, contents):
-    res = client.models.generate_content(
-        model=MODEL, contents=contents,
-        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0))
-    return json.loads(res.text)
-
-
-# لو ما فيه api key ندور على كلمات
-def extract_simple(text):
-    steps = []
-    for line in text.splitlines():
-        l = line.lower().replace("ّ", "")
-        if "screenshot" in l or "صور" in l:
-            m = re.match(r"(\d+)\.\s*", line)
-            steps.append({
-                "step_no": int(m.group(1)) if m else len(steps) + 1,
-                "title": line[m.end():] if m else line,
-                "evidence": ["المطلوب في الخطوة ظاهر"],
-                "temporary": "تختفي" in l or "يختفي" in l,
-            })
-    return steps
+    # النسخة المجانية 5 طلبات بالدقيقة بس، فلو طلع خطأ ننتظر ونعيد
+    for i in range(4):
+        try:
+            res = client.models.generate_content(model=MODEL, contents=contents,
+                config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0))
+            return json.loads(res.text)
+        except Exception as e:
+            if i == 3:
+                raise
+            print("retry", i + 1, str(e)[:50])
+            time.sleep(20)
 
 
 def extract_steps(text, client):
     if client:
         try:
-            return ask(client, [extract_prompt + text])["steps"]
+            data = ask(client, [extract_prompt + text])
+            # print(data)
+            return data["steps"]
         except Exception as e:
-            print(e)
-    return extract_simple(text)
+            print("AI failed:", e)
+
+    # بدون AI: أي سطر فيه screenshot او صور
+    steps = []
+    for line in text.splitlines():
+        l = line.lower().replace("ّ", "")  # عشان صوّر
+        if "screenshot" in l or "صور" in l:
+            m = re.match(r"(\d+)\.\s*", line)
+            if m:
+                no = int(m.group(1))
+                title = line[m.end():]
+            else:
+                no = len(steps) + 1
+                title = line
+            temp = False
+            if "تختفي" in l or "يختفي" in l:
+                temp = True
+            steps.append({"step_no": no, "title": title, "evidence": ["المطلوب في الخطوة ظاهر"], "temporary": temp})
+    return steps
 
 
 def check_image(img, step, client):
+    # اول شي نشوف الصورة نفسها قبل نرسلها
     if img.width < 500:
         return {"status": "unclear", "note": "الصورة صغيرة، صور الشاشة كاملة"}
-    sharp = ImageStat.Stat(img.convert("L").filter(ImageFilter.FIND_EDGES)).var[0]
-    if sharp < 100:
+
+    edges = img.convert("L").filter(ImageFilter.FIND_EDGES)
+    sharpness = ImageStat.Stat(edges).var[0]
+    # الصور المغبشة طلعت تحت 50 والواضحة فوق 700 فحطيت 100
+    if sharpness < 100:
         return {"status": "unclear", "note": "الصورة مغبشة صورها مرة ثانية"}
 
-    if not client:
+    if client is None:
         return {"status": "review", "note": "راجعها بنفسك"}
 
+    evidence = "\n".join(step["evidence"])
     try:
-        r = ask(client, [check_prompt % (step["title"], "\n".join(step["evidence"])), img.convert("RGB")])
+        r = ask(client, [check_prompt % (step["title"], evidence), img.convert("RGB")])
     except Exception as e:
         print(e)
         return {"status": "error", "note": "صار خطأ بالتحليل، راجعها بنفسك"}
 
-    # اذا مو متأكد ما نقبلها
+    if "status" not in r:
+        r["status"] = "unclear"
+    # لو قال مقبولة بس هو مو متأكد ما نعتمدها
     if r["status"] == "accepted" and r.get("confidence", 0) < 70:
         r["status"] = "review"
     return r
+
+# TODO: لو فيه وقت نخليه يصور الشاشة تلقائي بدل الرفع
