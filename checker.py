@@ -5,6 +5,8 @@ from google.genai import types
 
 # جربت gemini-2.5-flash بس صار ما يشتغل للمفاتيح الجديدة
 MODEL = 'gemini-3.5-flash'
+# لو خلصت الحصة اليومية (20 طلب بالمجاني) نجرب هذا
+MODEL2 = 'gemini-flash-lite-latest'
 
 extract_prompt = """Read these lab instructions. Return only the steps that ask the student to take a screenshot.
 For each step return:
@@ -40,15 +42,19 @@ def get_client(key=None):
 
 def ask(client, contents):
     # النسخة المجانية 5 طلبات بالدقيقة بس، فلو طلع خطأ ننتظر ونعيد
+    model = MODEL
     for i in range(4):
         try:
-            res = client.models.generate_content(model=MODEL, contents=contents,
+            res = client.models.generate_content(model=model, contents=contents,
                 config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0))
             return json.loads(res.text)
         except Exception as e:
             if i == 3:
                 raise
             print("retry", i + 1, str(e)[:50])
+            if "PerDay" in str(e) and model != MODEL2:
+                model = MODEL2
+                continue
             time.sleep(20)
 
 
