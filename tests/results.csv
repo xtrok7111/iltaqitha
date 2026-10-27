@@ -1,0 +1,11 @@
+﻿file,expected,result,note
+complete/step1.png,accepted,accepted,تم عرض اسم المستخدم واسم الجهاز في موجه التيرمنال والأوامر whoami و hostname مع نتائجها بنجاح.
+complete/step3.png,accepted,accepted,جميع المتطلبات متوفرة وتظهر بشكل واضح.
+complete/step4.png,accepted,accepted,جميع المتطلبات ظاهرة بشكل واضح ومكتملة.
+complete/step5.png,accepted,accepted,جميع العناصر المطلوبة متوفرة وواضحة
+incomplete/step1_no_command.png,missing,missing,الأوامر وموجه التيرمنال غير ظاهرة في الصورة، يظهر فقط الناتج بدون الأوامر.
+incomplete/step3_no_file.png,missing,missing,الملف notes.txt غير ظاهر في ناتج الأمر ls -l (النتيجة total 0)
+incomplete/step4_wrong_perm.png,missing,missing,تم تنفيذ الأمر chmod 644 بدلاً من chmod 640 وناتج الصلاحيات ظهر -rw-r--r-- بدلاً من -rw-r-----.
+incomplete/step4_wrong_step.png,missing,missing,لم يتم تنفيذ الأمر chmod 640 notes.txt، والصلاحيات الظاهرة هي -rw-r--r--
+incomplete/step5_blurry.png,unclear,unclear,الصورة مغبشة صورها مرة ثانية
+incomplete/step5_after_close.png,missing,missing,لم تظهر رسالة تشغيل السيرفر Server running on port 8080 وتم إيقاف البرنامج بواسطة KeyboardInterrupt.
